@@ -6,14 +6,13 @@
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
 xmlns:android="http://schemas.android.com/apk/res/android"
            id="cordova-plugin-websql"
-      version="0.0.10">
+      version="0.0.10.1wr">
     <name>Web SQL plugin</name>
 
     <description>Web Sql Plugin for Apache Cordova</description>
     <license>Apache 2.0</license>
     <keywords>cordova, websql, db, database</keywords>
-    <repo>https://github.com/msopentech/cordova-plugin-websql/</repo>
-    <issue>https://github.com/msopentech/cordova-plugin-websql/issues</issue>
+    <repo>https://github.com/webratio/cordova-plugin-websql/</repo>
 
     <platform name="wp8">
         <js-module src="www/WebSQL.js" name="WebSQL">
