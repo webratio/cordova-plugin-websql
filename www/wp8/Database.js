@@ -39,7 +39,8 @@ var Database = function (name, version, displayName, estimatedSize, creationCall
     var that = this;
 
     var openCallback = function(newVersion) {
-        that.version = parseInt(newVersion, 10);
+        newVersion = parseInt(newVersion, 10);
+        that.version = newVersion === 0 ? "" : String(newVersion);
         opened = true;
     };
 
@@ -213,8 +214,8 @@ Database.prototype.changeVersion = function (oldVersion, newVersion, cb, onError
 
     var transaction;
     var that = this;
-    var oldver = parseInt(oldVersion, 10);
-    var newVer = parseInt(newVersion, 10);
+    var oldver = oldVersion === "" ? 0 : parseInt(oldVersion, 10);
+    var newVer = newVersion === "" ? 0 : parseInt(newVersion, 10);
 
     if (isNaN(oldver) || isNaN(newVer)) {
         throw new Error("Version parameters should be valid integers or its' string representation");
@@ -234,7 +235,7 @@ Database.prototype.changeVersion = function (oldVersion, newVersion, cb, onError
 
     var postflight = function () {
         transaction.executeSql('PRAGMA user_version=' + newVer, null, function () {
-            that.version = newVer;
+            that.version = newVer === 0 ? "" : String(newVer);
         }, function () {
             throw new Error("Failed to set database version");
         });
