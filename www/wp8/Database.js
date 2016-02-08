@@ -156,6 +156,9 @@ Database.prototype._transaction = function (cb, onError, onSuccess, preflight, p
 
                         try {
                             cb(tx);
+                            if (!tx.transactionStarted) {
+                                tx.statementCompleted();
+                            }
                         } catch (cbEx) {
                             me.Log('transaction.run.connectionSuccess, executeTransaction callback error: ' + JSON.stringify(cbEx));
                             me.transactionError(tx, cbEx);
