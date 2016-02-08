@@ -160,10 +160,6 @@ Database.prototype.transaction = function (cb, onError, onSuccess, preflight, po
                             me.Log('transaction.run.connectionSuccess, executeTransaction callback error: ' + JSON.stringify(cbEx));
                             me.transactionError(tx, cbEx);
                         }
-
-                        if (postflight) {
-                            postflight();
-                        }
                     };
 
                     var internalError = function(tx, err) {
@@ -236,8 +232,6 @@ Database.prototype.changeVersion = function (oldVersion, newVersion, cb, onError
     var postflight = function () {
         transaction.executeSql('PRAGMA user_version=' + newVer, null, function () {
             that.version = newVer === 0 ? "" : String(newVer);
-        }, function () {
-            throw new Error("Failed to set database version");
         });
     };
 

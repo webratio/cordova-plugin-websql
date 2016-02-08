@@ -16,6 +16,7 @@ var SqlTransaction = function (onError, onSuccess, postflight, readOnly, transac
 
     this.statementsQueue = [];
     this.transactionStarted = false;
+    this.postflightRun = false;
 
     this.errorOccured = false;
     //this.Log('ctor');
@@ -60,13 +61,20 @@ SqlTransaction.prototype.statementCompleted = function () {
         }, "WebSql", "executeSql", [this.connectionId, 'ROLLBACK TO trx' + this.id, []]);
 
     } else if (this.statementsQueue.length === 0) {
+        this.transactionStarted = false;
         //me.Log('statementCompleted - statementsQueue is empty, transactionStarted: ' + me.transactionStarted);
 
-        exec(function () {
-            if (me.postflight) {
-                me.postflight();
-            }
+        if (!me.postflightRun && me.postflight) {
+            me.postflightRun = true;
+            me.statementsQueue.push({
+                task: me.postflight,
+                params: []
+            });
+            me.statementCompleted();
+            return;
+        }
 
+        exec(function () {
             if (me.isRoot) {
                 //me.Log('statementCompleted - statementsQueue is empty, going to DISCONNECT after COMMIT');
                 exec(function () {
