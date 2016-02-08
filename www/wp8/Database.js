@@ -81,8 +81,8 @@ Database.prototype.guid = (function () {
     };
 })();
 
-Database.prototype.transaction = function (cb, onError, onSuccess, preflight, postflight, readOnly, parentTransaction) {
-    //this.Log('transaction');
+Database.prototype._transaction = function (cb, onError, onSuccess, preflight, postflight, readOnly, parentTransaction) {
+    //this.Log('_transaction');
 
     if (typeof cb !== "function") {
         this.Log('transaction callback expected');
@@ -201,9 +201,14 @@ Database.prototype.transaction = function (cb, onError, onSuccess, preflight, po
     }
 };
 
+Database.prototype.transaction = function (cb, onError, onSuccess, preflight, postflight, parentTransaction) {
+    //this.Log('transaction');
+    this._transaction(cb, onError, onSuccess, preflight, postflight, false, parentTransaction);
+};
+
 Database.prototype.readTransaction = function (cb, onError, onSuccess, preflight, postflight, parentTransaction) {
     //this.Log('readTransaction');
-    this.transaction(cb, onError, onSuccess, preflight, postflight, true, parentTransaction);
+    this._transaction(cb, onError, onSuccess, preflight, postflight, true, parentTransaction);
 };
 
 Database.prototype.changeVersion = function (oldVersion, newVersion, cb, onError, onSuccess, parentTransaction) {
@@ -235,7 +240,7 @@ Database.prototype.changeVersion = function (oldVersion, newVersion, cb, onError
         });
     };
 
-    this.transaction(callback, onError, onSuccess, preflight, postflight, READWRITE, parentTransaction);
+    this._transaction(callback, onError, onSuccess, preflight, postflight, READWRITE, parentTransaction);
 };
 
 module.exports = Database;
