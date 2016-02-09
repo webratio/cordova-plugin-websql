@@ -272,7 +272,12 @@ SqlTransaction.prototype.executeSqlInternal = function(sql, params, onSuccess, o
                 refinedRow[originalRow[idxColumn].Key] = originalRow[idxColumn].Value;
             } 
         }
-   
+
+        // ensure that insertId stays there only for real inserts - TODO this would be better done in the native part
+        if (!/^\s*(insert|replace)\b/i.test(sql)) {
+            delete res.insertId;
+        }
+
         if (onSuccess) {
             try {
                 onSuccess(me, res);
