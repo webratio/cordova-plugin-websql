@@ -1808,7 +1808,7 @@ namespace SQLite
                                 targetType = typeof(string);
                                 break;
                             case SQLite3.ColType.Integer:
-                                targetType = typeof(int);
+                                targetType = typeof(long);
                                 break;
                             case SQLite3.ColType.Float:
                                 targetType = typeof(double);
