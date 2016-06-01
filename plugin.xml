@@ -15,7 +15,7 @@ xmlns:android="http://schemas.android.com/apk/res/android"
     <repo>https://github.com/webratio/cordova-plugin-websql/</repo>
 
     <platform name="wp8">
-        <js-module src="www/WebSQL.js" name="WebSQL">
+        <js-module src="www/WebSql.js" name="WebSQL">
             <merges target="window" />
         </js-module>
         <js-module src="www/wp8/Database.js" name="Database" />
@@ -32,7 +32,7 @@ xmlns:android="http://schemas.android.com/apk/res/android"
     </platform>
 
     <platform name="windows">
-        <js-module src="www/WebSQL.js" name="WebSQL">
+        <js-module src="www/WebSql.js" name="WebSQL">
             <merges target="window" />
         </js-module>
         <js-module src="www/windows/Database.js" name="Database" />
