@@ -260,18 +260,15 @@ SqlTransaction.prototype.executeSqlInternal = function(sql, params, onSuccess, o
             return res.rows[index];
         };
 
-        // process rows to be W3C spec compliant; TODO - this must be done inside native part for performance reasons
-        for (idxRow = 0; idxRow < res.rows.length; idxRow++) {
-            var originalRow = res.rows[idxRow],
-                refinedRow = {},
-                idxColumn;
-          
-            res.rows[idxRow] = refinedRow;
-
-            for (idxColumn in originalRow) {
-                refinedRow[originalRow[idxColumn].Key] = originalRow[idxColumn].Value;
-            } 
+        // process rows to be W3C spec compliant (i.e. turn them into maps of values by column name)
+        for (var idxRow = 0; idxRow < res.rows.length; idxRow++) {
+            var rowValues = res.rows[idxRow];
+            var rowObject = res.rows[idxRow] = {};
+            for (var idxColumn = 0; idxColumn < res.rowColumns.length; idxColumn++) {
+                rowObject[res.rowColumns[idxColumn]] = rowValues[idxColumn];
+            }
         }
+        delete res.rowColumns;
 
         // ensure that insertId stays there only for real inserts - TODO this would be better done in the native part
         if (!/^\s*(insert|replace)\b/i.test(sql)) {

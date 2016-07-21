@@ -21,10 +21,6 @@ namespace Cordova.Extension.Commands
     /// </summary>
     public class WebSql : BaseCommand
     {
-        public class QueryRow : List<QueryColumn> {}
-
-        public class SqlResultSetRowList : List<QueryRow> {}
-
         [DataContract]
         public class SqlResultSet
         {
@@ -33,22 +29,10 @@ namespace Cordova.Extension.Commands
             [DataMember(Name = "rowsAffected")]
             public long RowsAffected;
             [DataMember(Name = "rows")]
-            public SqlResultSetRowList Rows = new SqlResultSetRowList();
+            public List<List<object>> Rows = new List<List<object>>();
+            [DataMember(Name = "rowColumns")]
+            public List<string> RowColumns = new List<string>();
         };
-        [DataContract]
-        public class QueryColumn
-        {
-            [DataMember]
-            public string Key;
-            [DataMember]
-            public object Value;
-
-            public QueryColumn(string key, object value)
-            {
-                Key = key;
-                Value = value;
-            }
-        }
 
         [DataContract]
         private class ConnectionInfo
@@ -255,12 +239,12 @@ namespace Cordova.Extension.Commands
                         : JsonHelper.Deserialize<object[]>(args[2]);
 
                     var resultSet = new SqlResultSet();
+                    var dbResultSet = _dbConnections[connectionId].Query2(query, queryParams);
 
-                    foreach (var row in _dbConnections[connectionId].Query2(query, queryParams))
+                    resultSet.RowColumns.AddRange(dbResultSet.ColumnNames);
+                    foreach (var row in dbResultSet)
                     {
-                        var resultRow = new QueryRow();
-                        resultRow.AddRange(row.column.Select(column => new QueryColumn(column.Key, column.Value)));
-                        resultSet.Rows.Add(resultRow);
+                        resultSet.Rows.Add(row.Values);
                     }
 
                     resultSet.InsertId = SQLite3.LastInsertRowid(_dbConnections[connectionId].Handle);

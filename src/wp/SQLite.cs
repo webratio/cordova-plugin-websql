@@ -24,6 +24,7 @@
 #endif
 
 using System;
+using System.Collections;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
@@ -43,16 +44,6 @@ using Sqlite3Statement = System.IntPtr;
 
 namespace SQLite
 {
-    public class SQLiteQueryRow
-    {
-        public List<SQLiteQueryColumn> column;
-    }
-    public class SQLiteQueryColumn
-    {
-        public string Key;
-        public object Value;
-    }
-
     public class SQLiteException : System.Exception
     {
         public SQLite3.Result Result { get; private set; }
@@ -615,18 +606,8 @@ namespace SQLite
             var cmd = CreateCommand(query, args);
             return cmd.ExecuteQuery<object>(map);
         }
-        /*
-        public class SQLiteQueryRow
-        {
-            public List<SQLiteQueryColumn> column;
-        }
-        public class SQLiteQueryColumn
-        {
-            public string Key;
-            public object Value;
-        }
-        */
-        public List<SQLiteQueryRow> Query2(string query, params object[] args)
+
+        public SQLiteCommand.ResultSet Query2(string query, params object[] args)
         {
             var cmd = CreateCommand(query, args);
             return cmd.ExecuteQuery();
@@ -1761,22 +1742,20 @@ namespace SQLite
             return ExecuteDeferredQuery<T>(map).ToList();
         }
 
-        public List<SQLiteQueryRow> ExecuteQuery()
+        public ResultSet ExecuteQuery()
         {
-            return ExecuteDeferredQuery().ToList();
+            using (LiveResultSet rs = ExecuteDeferredQuery())
+            {
+                var rows = new List<ResultRow>();
+                foreach (ResultRow row in rs)
+                {
+                    rows.Add(row);
+                }
+                return new ResultSet(rs.ColumnNames, rows.AsReadOnly());
+            }
         }
-        /*
-        public class SQLiteQueryRow
-        {
-            public List<SQLiteQueryColumn> column;
-        }
-        public class SQLiteQueryColumn
-        {
-            public string Key;
-            public object Value;
-        }
-        */
-        public IEnumerable<SQLiteQueryRow> ExecuteDeferredQuery()
+
+        public LiveResultSet ExecuteDeferredQuery()
         {
             if (_conn.Trace)
             {
@@ -1784,57 +1763,123 @@ namespace SQLite
             }
 
             var stmt = Prepare();
-            try
+            return new LiveResultSet(this, stmt);
+        }
+
+        public class ResultRow
+        {
+            public readonly List<object> Values;
+
+            public ResultRow(int columnCount)
             {
-                var cols = new string[SQLite3.ColumnCount(stmt)];
-
-                for (int i = 0; i < cols.Length; i++)
-                {
-                    var name = SQLite3.ColumnName16(stmt, i);
-                    cols[i] = name;
-                }
-
-                while (SQLite3.Step(stmt) == SQLite3.Result.Row)
-                {
-                    var row = new SQLiteQueryRow();
-                    for (int i = 0; i < cols.Length; i++)
-                    {
-                        var colType = SQLite3.ColumnType(stmt, i);
-
-                        Type targetType;
-                        switch (colType)
-                        {
-                            case SQLite3.ColType.Text:
-                                targetType = typeof(string);
-                                break;
-                            case SQLite3.ColType.Integer:
-                                targetType = typeof(long);
-                                break;
-                            case SQLite3.ColType.Float:
-                                targetType = typeof(double);
-                                break;
-                            default:
-                                targetType = typeof(object);
-                                break;
-                        }
-
-                        var val = ReadCol(stmt, i, colType, targetType);
-                        var column = new SQLiteQueryColumn();
-                        column.Key = cols[i];
-                        column.Value = val;
-                        if (row.column == null)
-                            row.column = new List<SQLiteQueryColumn>();
-                        row.column.Add(column);
-                    }
-                    OnInstanceCreated(row);
-                    yield return row;
-                }
-            }
-            finally
-            {
-                SQLite3.Finalize(stmt);
+                Values = new List<object>(columnCount);
             }
         }
+
+        public class LiveResultSet : IEnumerable<ResultRow>, IDisposable
+        {
+            private readonly SQLiteCommand command;
+            private Sqlite3.Vdbe stmt;
+            private readonly List<string> colNames;
+
+            public LiveResultSet(SQLiteCommand command, Sqlite3.Vdbe stmt)
+            {
+                this.command = command;
+                this.stmt = stmt;
+
+                // Read column names and types
+                var colCount = SQLite3.ColumnCount(stmt);
+                this.colNames = new List<string>(colCount);
+                for (int i = 0; i < colCount; i++)
+                {
+                    this.colNames.Add(SQLite3.ColumnName16(stmt, i));
+                }
+            }
+
+            public IList<string> ColumnNames
+            {
+                get
+                {
+                    return colNames.AsReadOnly();
+                }
+            }
+
+            public IEnumerator<ResultRow> GetEnumerator()
+            {
+                try {
+                    var colCount = this.colNames.Count;
+                    while (SQLite3.Step(stmt) == SQLite3.Result.Row)
+                    {
+                        var row = new ResultRow(colCount);
+                        for (var i = 0; i < colCount; i++)
+                        {
+                            var colType = SQLite3.ColumnType(stmt, i);
+
+                            Type targetType;
+                            switch (colType)
+                            {
+                                case SQLite3.ColType.Text:
+                                    targetType = typeof(string);
+                                    break;
+                                case SQLite3.ColType.Integer:
+                                    targetType = typeof(long);
+                                    break;
+                                case SQLite3.ColType.Float:
+                                    targetType = typeof(double);
+                                    break;
+                                default:
+                                    targetType = typeof(object);
+                                    break;
+                            }
+
+                            row.Values.Add(this.command.ReadCol(this.stmt, i, colType, targetType));
+                        }
+                        this.command.OnInstanceCreated(row);
+                        yield return row;
+                    }
+                } finally
+                {
+                    Dispose();
+                }
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return this.GetEnumerator();
+            }
+
+            public void Dispose()
+            {
+                if (this.stmt != null)
+                {
+                    SQLite3.Finalize(this.stmt);
+                    this.stmt = null;
+                }
+            }
+        }
+
+        public class ResultSet : IEnumerable<ResultRow>
+        {
+            public readonly IList<string> ColumnNames;
+            public readonly IList<ResultRow> Rows;
+
+            public ResultSet(IList<string> colNames, IList<ResultRow> rows)
+            {
+                this.ColumnNames = colNames;
+                this.Rows = rows;
+            }
+
+            public IEnumerator<ResultRow> GetEnumerator()
+            {
+                return Rows.GetEnumerator();
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return this.GetEnumerator();
+            }
+        }
+
         /// <summary>
         /// Invoked every time an instance is loaded from the database.
         /// </summary>
