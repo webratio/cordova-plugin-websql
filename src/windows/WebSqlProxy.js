@@ -22,6 +22,9 @@ module.exports = {
 
             var res = SQLite.Proxy.SQLiteProxy.getVersion(module.exports.db);
             res = JSON.parse(res);
+            if (res == 0) {
+                res = -1;
+            }
 
             if (res && res.message) {
                 fail(res);
