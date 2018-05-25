@@ -84,28 +84,30 @@ module.exports = {
     },
 
     executeSql: function (success, fail, args) {
-        try {
-            var connectionId = args.shift();
-            var pr = Promise.resolve(SQLite.Proxy.SQLiteProxy.executeSql(connectionId, args));
-            pr.then(function (res) { // Using Promise for queuing callbacks into a new microtask, as the spec requires
-                res = JSON.parse(res);
-
-                // You can't access the original message text from JavaScript code.
-                // http://msdn.microsoft.com/en-US/library/windows/apps/br230301.aspx#ThrowingExceptions
-                // so we return it via custom object
-                if (res && res.message) {
-                    fail(res);
-                    return;
-                }
-
-                success(res);
-            }).catch(function (ex) {
-                fail(ex);
-            })
-        } catch (ex) {
-            fail(ex);
-        }
-    },
+    	// WR 12856
+    	// Using setImmediate for queuing callbacks into a new macrotask instead of a microtask, to avoid 
+    	// starvation of macrotasks due to polling
+		setImmediate(function () {
+			try {
+				var connectionId = args.shift();
+				var res = SQLite.Proxy.SQLiteProxy.executeSql(connectionId, args);
+				res = JSON.parse(res);
+				
+				// You can't access the original message text from JavaScript code.
+				// http://msdn.microsoft.com/en-US/library/windows/apps/br230301.aspx#ThrowingExceptions
+				// so we return it via custom object
+				if (res && res.message) {
+					fail(res);
+					return;
+				}
+				
+				success(res);
+			} catch (ex) {
+				fail(ex);
+			}
+		});
+		// WR END
+	},
 
     _tryConnect: function () {
         if (!connected && connectQueue.length) {

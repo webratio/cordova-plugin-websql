@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.IO;
@@ -13,6 +13,8 @@ namespace SQLite.Proxy
     public sealed class SQLiteProxy
     {
         private static Dictionary<long, SqliteConnection> _dbConnections = new Dictionary<long, SqliteConnection>();
+        private static Dictionary<string, long> _dbConnectionStrings = new Dictionary<string, long>();
+        private static Dictionary<long, string> _dbConnectionIds = new Dictionary<long, string>();
         private static int _retriesCount = 3;
 
         public static string ConnectToDb(string dbname)
@@ -29,6 +31,8 @@ namespace SQLite.Proxy
 
                     var newId = _dbConnections.Keys.DefaultIfEmpty(0).Max() + 1;
                     _dbConnections.Add(newId, connection);
+                    _dbConnectionStrings.Add(connectionString, newId);
+                    _dbConnectionIds.Add(newId, connectionString);
                     result.Id = newId;
 
                     String[] emptyParams = { };
@@ -61,12 +65,26 @@ namespace SQLite.Proxy
             {
                 try
                 {
-                    var connection = new SqliteConnection(string.Format("Version=3,uri=file:{0}", dbname));
-                    connection.Open();
-
+                    // WR 12856
+                    // try to reuse any opened connection before creating a new one
+                    var connectionString = string.Format("Version=3,uri=file:{0}", dbname);
+                    var connection = (SqliteConnection)null;
+                    if (_dbConnectionStrings.ContainsKey(connectionString)) {
+                        long connectionId = _dbConnectionStrings[connectionString];
+                        connection = _dbConnections[connectionId];
+                    } else
+                    {
+                        connection = new SqliteConnection(connectionString);
+                        connection.Open();
+                    }
+                    
                     result = new SqliteCommand("PRAGMA user_version", connection).ExecuteScalar();
 
-                    connection.Close();
+                    if (!_dbConnectionStrings.ContainsKey(connectionString))
+                    {
+                        connection.Close();
+                    }
+                    // WR END
                     break;
                 }
                 catch (Exception ex)
@@ -112,6 +130,14 @@ namespace SQLite.Proxy
                 var connection = _dbConnections[connectionId];
                 connection.Close();
                 _dbConnections.Remove(connectionId);
+                // WR 12856
+                if (_dbConnectionIds.ContainsKey(connectionId))
+                {
+                    string connectionString = _dbConnectionIds[connectionId];
+                    _dbConnectionStrings.Remove(connectionString);
+                    _dbConnectionIds.Remove(connectionId);
+                }
+                // WR END
             }
             catch (Exception ex)
             {
